@@ -1,0 +1,4 @@
+*.tf @your-team
+.github/ @security-team
+.github/workflows/ @devops-team
+README.md @team-leads
