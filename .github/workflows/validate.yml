@@ -1,22 +1,53 @@
-#!/usr/bin/env bash
-set -Eeuo pipefail
+name: Infrastructure PR Validation
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-INFRA_DIR="${REPO_ROOT}/infra"
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
 
-if ! command -v tofu >/dev/null 2>&1; then
-  echo "OpenTofu is not installed or not on PATH."
-  exit 1
-fi
+permissions:
+  contents: read
 
-cd "${INFRA_DIR}"
+concurrency:
+  group: infra-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
-echo "Checking formatting..."
-tofu fmt -check -recursive
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 15
 
-echo "Initializing OpenTofu without remote backend..."
-tofu init -backend=false -input=false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
-echo "Validating configuration..."
-tofu validate -no-color
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@v2.0.2
+        with:
+          tofu_version: "1.13.2"
+
+      - name: Check formatting
+        working-directory: infra
+        run: tofu fmt -check -recursive
+
+      - name: Initialize without remote backend
+        working-directory: infra
+        run: tofu init -backend=false -input=false
+
+      - name: Validate configuration
+        working-directory: infra
+        run: tofu validate -no-color
+
+      - name: Install IaC scanner
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install checkov
+
+      - name: Scan infrastructure
+        run: checkov -d infra --framework terraform
