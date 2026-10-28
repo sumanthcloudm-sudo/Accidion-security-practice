@@ -1,1 +1,1 @@
-rovider "opentofu" {}
+provider "opentofu" {}
