@@ -56,4 +56,3 @@ jobs:
 
       - name: Analyze Python code
         uses: github/codeql-action/analyze@v3
-```
