@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 15
@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up OpenTofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: "1.13.2"
 
@@ -45,7 +45,9 @@ jobs:
         run: tofu validate -no-color
 
       - name: Install IaC scanner
-        run: python -m pip install "checkov==3.2.0"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install checkov
 
       - name: Scan infrastructure
         run: checkov -d infra --framework terraform
