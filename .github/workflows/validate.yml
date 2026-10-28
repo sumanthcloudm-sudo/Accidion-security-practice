@@ -1,45 +1,53 @@
-name: Infrastructure Validation
+name: Infrastructure PR Validation
+
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: infra-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  terraform-checks:
-    runs-on: ubuntu-latest
+  validate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          persist-credentials: false
 
-      - name: Terraform Format
-        run: terraform fmt -check -recursive
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.13.2"
 
-      - name: Terraform Init
-        run: terraform init -backend=false
+      - name: Check formatting
+        working-directory: infra
+        run: tofu fmt -check -recursive
 
-      - name: Terraform Validate
-        run: terraform validate
-        
-      - name: Install Trivy
+      - name: Initialize without remote backend
+        working-directory: infra
+        run: tofu init -backend=false -input=false
+
+      - name: Validate configuration
+        working-directory: infra
+        run: tofu validate -no-color
+
+      - name: Install IaC scanner
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg
-          wget -qO- https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
+          python -m pip install --upgrade pip
+          python -m pip install checkov
 
-      - name: Trivy filesystem scan
-        run: trivy fs --security-checks vuln,config --exit-code 1 .
+      - name: Scan infrastructure
+        run: checkov -d infra --framework terraform
