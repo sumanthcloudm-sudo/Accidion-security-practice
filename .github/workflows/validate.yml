@@ -23,12 +23,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@<REVIEWED_FULL_COMMIT_SHA>
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
 
       - name: Set up OpenTofu
-        uses: opentofu/setup-opentofu@<REVIEWED_FULL_COMMIT_SHA>
+        uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: "1.13.2"
 
@@ -46,7 +46,8 @@ jobs:
 
       - name: Install IaC scanner
         run: |
-          python -m pip install checkov==<REVIEWED_VERSION>
+          python -m pip install --upgrade pip
+          python -m pip install checkov
 
       - name: Scan infrastructure
         run: checkov -d infra --framework terraform
