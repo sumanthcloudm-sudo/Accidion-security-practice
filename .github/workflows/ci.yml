@@ -39,7 +39,6 @@ jobs:
   codeql:
     name: CodeQL Security Analysis
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       security-events: write
@@ -53,6 +52,7 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: python
+          build-mode: none
 
       - name: Analyze Python code
         uses: github/codeql-action/analyze@v3
