@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
-  security-events: write   # needed for CodeQL
+  security-events: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -21,10 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        uses: actions/checkout@v4
 
       - name: Set up JDK 25
-        uses: actions/setup-java@99b8673ff64fbf99d8d325f73a6c8e5a2b1a8c8a  # v4.2.1
+        uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -42,10 +42,10 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        uses: actions/checkout@v4
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@0c155c8e3d3d5e5c5e5c5e5c5e5c5e5c5e5c5e5c  # placeholder – replace with real SHA
+        uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
 
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        uses: actions/checkout@v4
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -72,16 +72,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        uses: actions/checkout@v4
 
       - name: Set up JDK 25
-        uses: actions/setup-java@99b8673ff64fbf99d8d325f73a6c8e5a2b1a8c8a  # v4.2.1
+        uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
 
-      # Placeholder – replace with real isolation test command once tests exist
       - name: Run tenant-isolation tests
         run: |
           echo "Tenant isolation suite – will fail the job when real tests are added"
