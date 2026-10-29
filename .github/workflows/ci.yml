@@ -68,3 +68,17 @@ jobs:
         if: steps.infra_dir.outputs.exists == 'true'
         working-directory: infra
         run: tofu validate -no-color
+
+      - name: Initialize CodeQL
+        if: steps.java_project.outputs.exists == 'true'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+
+      - name: Autobuild Java
+        if: steps.java_project.outputs.exists == 'true'
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze Java
+        if: steps.java_project.outputs.exists == 'true'
+        uses: github/codeql-action/analyze@v3
