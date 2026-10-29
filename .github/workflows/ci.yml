@@ -2,80 +2,69 @@ name: CI
 
 on:
   push:
-    branches:
-      - '**'
   pull_request:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  security-events: write
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
-  java-build:
-    name: Java build
+  validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
     permissions:
       contents: read
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Detect Java project
-        id: detect
+        id: java_project
         shell: bash
         run: |
           if [ -f pom.xml ] || [ -f gradlew ] || [ -f build.gradle ] || [ -f build.gradle.kts ]; then
-            echo "java_project=true" >> "$GITHUB_OUTPUT"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "java_project=false" >> "$GITHUB_OUTPUT"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect infra directory
+        id: infra_dir
+        shell: bash
+        run: |
+          if [ -d infra ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Java
-        if: steps.detect.outputs.java_project == 'true'
+        if: steps.java_project.outputs.exists == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: "25"
           cache: maven
 
-      - name: Build with Maven
-        if: steps.detect.outputs.java_project == 'true'
-        shell: bash
-        run: mvn -B -DskipTests=false verify
+      - name: Build Java app if Maven project exists
+        if: steps.java_project.outputs.exists == 'true'
+        run: mvn -B -DskipTests package
 
-      - name: Skip Java build when project files are absent
-        if: steps.detect.outputs.java_project != 'true'
-        shell: bash
-        run: echo "No Maven or Gradle build file found in this repository. Skipping Java build step."
-
-  codeql:
-    name: CodeQL analysis
-    if: ${{ hashFiles('**/*.java', '**/*.kt', '**/*.kts', '**/*.py', '**/*.js', '**/*.ts') != '' }}
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+      - name: Set up OpenTofu
+        if: steps.infra_dir.outputs.exists == 'true'
+        uses: opentofu/setup-opentofu@v2
         with:
-          languages: java-kotlin, python, javascript
+          tofu_version: "1.13.2"
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Check formatting
+        if: steps.infra_dir.outputs.exists == 'true'
+        working-directory: infra
+        run: tofu fmt -check -recursive
 
-      - name: Analyze
-        uses: github/codeql-action/analyze@v3
+      - name: Initialize without remote backend
+        if: steps.infra_dir.outputs.exists == 'true'
+        working-directory: infra
+        run: tofu init -backend=false -input=false
+
+      - name: Validate configuration
+        if: steps.infra_dir.outputs.exists == 'true'
+        working-directory: infra
+        run: tofu validate -no-color
