@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Detect Java project
+        id: java_project
+        shell: bash
+        run: |
+          if [ -f pom.xml ] || [ -f gradlew ] || [ -f build.gradle ] || [ -f build.gradle.kts ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect infra directory
+        id: infra_dir
+        shell: bash
+        run: |
+          if [ -d infra ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Java
+        if: steps.java_project.outputs.exists == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Build Java app if Maven project exists
+        if: steps.java_project.outputs.exists == 'true'
+        run: mvn -B -DskipTests package
+
+      - name: Set up OpenTofu
+        if: steps.infra_dir.outputs.exists == 'true'
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.13.2"
+
+      - name: Check formatting
+        if: steps.infra_dir.outputs.exists == 'true'
+        working-directory: infra
+        run: tofu fmt -check -recursive
+
+      - name: Initialize without remote backend
+        if: steps.infra_dir.outputs.exists == 'true'
+        working-directory: infra
+        run: tofu init -backend=false -input=false
+
+      - name: Validate configuration
+        if: steps.infra_dir.outputs.exists == 'true'
+        working-directory: infra
+        run: tofu validate -no-color
+
+      - name: Initialize CodeQL
+        if: steps.java_project.outputs.exists == 'true'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+
+      - name: Autobuild Java
+        if: steps.java_project.outputs.exists == 'true'
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze Java
+        if: steps.java_project.outputs.exists == 'true'
+        uses: github/codeql-action/analyze@v3
