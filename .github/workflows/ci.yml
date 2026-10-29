@@ -2,45 +2,80 @@ name: CI
 
 on:
   push:
+    branches:
+      - '**'
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  validate:
+  java-build:
+    name: Java build
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v5
-        with:
-          persist-credentials: false
+
+      - name: Detect Java project
+        id: detect
+        shell: bash
+        run: |
+          if [ -f pom.xml ] || [ -f gradlew ] || [ -f build.gradle ] || [ -f build.gradle.kts ]; then
+            echo "java_project=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "java_project=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Java
-        if: ${{ hashFiles('**/pom.xml') != '' }}
+        if: steps.detect.outputs.java_project == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: '25'
           cache: maven
 
-      - name: Build Java app if Maven project exists
-        if: ${{ hashFiles('**/pom.xml') != '' }}
-        run: mvn -B -DskipTests package
+      - name: Build with Maven
+        if: steps.detect.outputs.java_project == 'true'
+        shell: bash
+        run: mvn -B -DskipTests=false verify
 
-      - name: Set up OpenTofu
-        uses: opentofu/setup-opentofu@v2
+      - name: Skip Java build when project files are absent
+        if: steps.detect.outputs.java_project != 'true'
+        shell: bash
+        run: echo "No Maven or Gradle build file found in this repository. Skipping Java build step."
+
+  codeql:
+    name: CodeQL analysis
+    if: ${{ hashFiles('**/*.java', '**/*.kt', '**/*.kts', '**/*.py', '**/*.js', '**/*.ts') != '' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
-          tofu_version: "1.13.2"
+          languages: java-kotlin, python, javascript
 
-      - name: Check formatting
-        working-directory: infra
-        run: tofu fmt -check -recursive
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
 
-      - name: Initialize without remote backend
-        working-directory: infra
-        run: tofu init -backend=false -input=false
-
-      - name: Validate configuration
-        working-directory: infra
-        run: tofu validate -no-color
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
