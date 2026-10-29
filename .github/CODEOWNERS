@@ -1,0 +1,25 @@
+# AccIDion CODEOWNERS
+# These owners must approve changes to the listed paths.
+# Last matching pattern wins.
+
+# Default owners for everything
+*                           @accidion/platform
+
+# Critical standards and CI
+/.github/                   @accidion/platform @accidion/security
+/AGENTS.md                  @accidion/platform
+/RULES.md                   @accidion/platform
+/.github/CODEOWNERS         @accidion/platform @accidion/security
+
+# Infrastructure – CI-only applies
+/infra/                     @accidion/platform @accidion/devops
+
+# Security-sensitive areas
+/**/auth/                   @accidion/security @accidion/platform
+/**/iam/                    @accidion/security @accidion/platform
+/**/tenant/                 @accidion/security @accidion/platform
+/**/isolation/              @accidion/security @accidion/platform
+
+# Database migrations
+/**/migration/              @accidion/platform
+/**/migrations/             @accidion/platform
